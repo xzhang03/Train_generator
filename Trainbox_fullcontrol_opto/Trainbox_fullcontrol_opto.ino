@@ -21,7 +21,7 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);        // select the pins used on the LCD p
 
 
 // UI variables
-bool infinitymode = false;  // Infinite pulses
+bool infinitymode = true;  // Infinite pulses
 unsigned long tepTimer;
 unsigned int val;                             // variable to store the value coming from the analog pin
 byte button;                          // 5 - nothing, 4 - select, 3 - left, 2 - down, 1 - up, 0 - right
@@ -32,15 +32,15 @@ bool showinstruction = true; // Show instructions or not
 const byte pin = 2;
 
 // Train variables
-unsigned int pulsewidth = 150; // in millisecs
-unsigned int pulsecycle = 300; // in millisecs
-byte pulsenum = 5; // in integers
-unsigned long traincycle = 60000; // in millisecs
+unsigned int pulsewidth = 10; // in millisecs
+unsigned int pulsecycle = 50; // in millisecs
+byte pulsenum = 40; // in integers
+unsigned long traincycle = 10000; // in millisecs
 unsigned int trainnum = 15; // in integers
 
 // Train increments
-unsigned int pulsewidthinc = 50; // in millisecs
-unsigned int pulsecycleinc = 50; // in millisecs
+unsigned int pulsewidthinc = 10; // in millisecs
+unsigned int pulsecycleinc = 10; // in millisecs
 byte pulsenuminc = 1; // in integers
 unsigned long traincycleinc1 = 1000; // in millisecs
 unsigned long traincycleinc2 = 10000; // in millisecs
@@ -383,7 +383,7 @@ void loop(){
   }
 
   //
-  if((millis() - tepTimer > 200) && trainon){         // output a temperature value per 500ms
+  if((millis() - tepTimer > 500) && trainon){         // output a temperature value per 500ms
     tepTimer = millis();
 
     // print the results to the lcd
