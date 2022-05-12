@@ -18,6 +18,8 @@
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);        // select the pins used on the LCD panel
 
+// DEBUG master_switch
+#define debugmode false
 
 
 // UI variables
@@ -25,18 +27,22 @@ bool infinitymode = false;  // Infinite pulses
 unsigned long tepTimer;
 unsigned int val;                             // variable to store the value coming from the analog pin
 byte button;                          // 5 - nothing, 4 - select, 3 - left, 2 - down, 1 - up, 0 - right
-byte cursorind = 6;                   // 1 - Pulse width, 2 - Pulse cycle, 3 - Pulses per train, 4 - Train cycle, 5 - Number of trains, 6 - Start
+byte cursorind = 7;                   // 1 - Pulse width, 2 - Pulse cycle, 3 - Pulses per train, 4 - Train cycle, 5 - Number of trains, 6 - Delay, 7 - Start
+const byte maxcursorind = 7;
 bool showinstruction = true; // Show instructions or not
 
 // Output variables
 const byte pin = 2;
+const byte pin_train = 3; // Digital signal for when each train starts
 
 // Train variables
 unsigned int pulsewidth = 150; // in millisecs
 unsigned int pulsecycle = 300; // in millisecs
+unsigned int trainsig_width = 5; // in millisecs
 byte pulsenum = 5; // in integers
 unsigned long traincycle = 60000; // in millisecs
 unsigned int trainnum = 15; // in integers
+unsigned long traindelay = 120000; // in millisecs
 
 // Train increments
 unsigned int pulsewidthinc = 50; // in millisecs
@@ -45,15 +51,19 @@ byte pulsenuminc = 1; // in integers
 unsigned long traincycleinc1 = 1000; // in millisecs
 unsigned long traincycleinc2 = 10000; // in millisecs
 byte trainnuminc = 1; // in integers
+unsigned long traindelayinc1 = 1000; // in milliseconds
+unsigned long traindelayinc2 = 10000; // in milliseconds
 
 // Runningtrain variables
 byte pulseremain;
 byte trainremain;
 bool pulseon = false;
 bool trainon = false;
+bool delayon = false;
+bool trainsigon = false;
 
 // Pulse time variables
-unsigned long t0, tnow, t0train, tnowtrain;
+unsigned long t0, t1, tnow, t0train, tnowtrain, t0delay, tnowdelay;
 
 // Button buffer
 unsigned long startbuttonhold = 2000; // in millisecs
@@ -80,7 +90,7 @@ void setup(){
   pinMode(pin, OUTPUT);
 
   // Serial
-  if (Serial.available() > 0){
+  if (debugmode){
     Serial.begin(9600);
     Serial.print("Pulse width (ms): ");
     Serial.println(pulsewidth);
@@ -92,6 +102,10 @@ void setup(){
     Serial.println(traincycle/1000);
     Serial.print("Number of trains: ");
     Serial.println(trainnum);
+    Serial.print("Train delay (s): ");
+    Serial.println(traindelay/1000);
+    Serial.print("Train pulse width (ms): ");
+    Serial.println(trainsig_width);
   }
   // print train info
   /*
@@ -123,16 +137,19 @@ void setup(){
   // Time
   t0 = millis();
   t0train = millis();
+  t0delay = millis();
 
   // Reset
-  pulseremain = pulsenum;
-  trainremain = trainnum;
+  pulseremain = 0;
+  trainremain = 0;
 }
 
 void loop(){
   // Time
-  tnow = millis() - t0;
-  tnowtrain = millis() - t0train;
+  t1 = millis();
+  tnow = t1 - t0;
+  tnowtrain = t1 - t0train;
+  tnowdelay = t1 - t0delay;
 
   // Input low noise
   /*
@@ -154,7 +171,7 @@ void loop(){
 
   // Page down
   if ((button == 2) && !downbuttondown){
-    if (cursorind < 6){
+    if (cursorind < maxcursorind){
       cursorind++;
     }
     else{
@@ -172,7 +189,7 @@ void loop(){
       cursorind--;
     }
     else{
-      cursorind = 6;
+      cursorind = maxcursorind;
     }
     upbuttondown = true;
   }
@@ -208,6 +225,15 @@ void loop(){
         // train num
         if (!infinitymode){
           trainnum = trainnum + trainnuminc;
+        }
+        break;
+      case 6:
+        // train delay
+        if (traindelay >= traindelayinc2){
+          traindelay = traindelay + traindelayinc2;
+        }
+        else{
+          traindelay = traindelay + traindelayinc1;
         }
         break;
     }
@@ -255,6 +281,15 @@ void loop(){
           }
         }
         break;
+      case 6:
+        // train cycle
+        if (traindelay > traindelayinc2){
+          traindelay = traindelay - traindelayinc2;
+        }
+        else if(traindelay >= traindelayinc1){
+          traindelay = traindelay - traindelayinc1;
+        }
+        break;
     }
     leftbuttondown = true;
   }
@@ -263,7 +298,7 @@ void loop(){
   }
   
   // lcd, set up stage
-  if((millis() - tepTimer > 200) && !trainon){         // output a temperature value per 500ms
+  if((millis() - tepTimer > 300) && !trainon && !delayon){         // output a temperature value per 500ms
     tepTimer = millis();
 
     // print the results to the lcd
@@ -306,6 +341,12 @@ void loop(){
         lcd.print("              ");
         break;
       case 6:
+        lcd.print("Train delay:    ");
+        lcd.setCursor(0, 1);
+        lcd.print(traindelay/1000);
+        lcd.print(" s           ");
+        break;
+      case maxcursorind:
         lcd.print("P ");
         lcd.print(pulsenum);
         lcd.print(" X ");
@@ -323,22 +364,25 @@ void loop(){
         }
         lcd.print(" X ");
         lcd.print(traincycle/1000);
+        lcd.print(" D ");
+        lcd.print(traindelay/1000);
         lcd.print("         ");
         break;
     }
 
     // Pushing
     if (startbuttondown){
-      lcd.setCursor(12, 1);
-      lcd.print("HOLD");
+      lcd.setCursor(15, 1);
+      lcd.print("H");
     }
     else{
-      lcd.setCursor(12, 1);
-      lcd.print("    ");
+      lcd.setCursor(15, 1);
+      lcd.print(" ");
     }
     
   }
-  
+
+  // Holding start
   if (button == 4){
     startbuttoncurrenttime = millis();
     // First time start button down
@@ -346,15 +390,33 @@ void loop(){
       startbuttondowntime = startbuttoncurrenttime;
       startbuttondown = true;
     }
-    else if ((startbuttoncurrenttime - startbuttondowntime > startbuttonhold) && !trainon){
-      trainon = true;
-      t0train = millis();
-      pulseremain = pulsenum;
-      trainremain = trainnum;
+    else if ((startbuttoncurrenttime - startbuttondowntime > startbuttonhold) && !trainon && !delayon){
+      // Starting delay, which can be 0
+      delayon = true;
+      t0delay = t1;
+      tnowdelay = 0;
+
+      if (debugmode){
+        Serial.print("Train delay starting at (s):");
+        Serial.println(t1/1000);
+      }
     }
   }
   else{
     startbuttondown = false;
+  }
+
+  // Delay is on
+  if ((tnowdelay >= traindelay) && (delayon == true)){
+    delayon = false;
+    trainon = true;
+    t0train = millis();
+    trainremain = trainnum;
+
+    if (debugmode){
+      Serial.print("Train is starting at (s):");
+      Serial.println(t1/1000);
+    }
   }
   
   // LED off
@@ -371,6 +433,14 @@ void loop(){
     t0 = millis();
     digitalWrite(13, HIGH);
     digitalWrite(pin, HIGH);
+
+    if (debugmode){
+      Serial.print("Pulse at ms = ");
+      Serial.print(tnow);
+      Serial.print(" ");
+      Serial.print(pulseremain);
+      Serial.println(" pulses left.");
+    }
   }
 
   // Train
@@ -380,15 +450,38 @@ void loop(){
     }
     t0train = millis();
     pulseremain = pulsenum;
+
+    // Train on signal
+    digitalWrite(pin_train, HIGH);
+    trainsigon = true;
+
+    if (debugmode){
+      Serial.print("Train ");
+      Serial.print(trainremain);
+      Serial.print(" starts at T = ");
+      Serial.print(t1/1000);
+      Serial.print(" with ");
+      Serial.print(pulseremain);
+      Serial.println(" pulses to start.");
+    }
   }
 
-  //
-  if((millis() - tepTimer > 200) && trainon){         // output a temperature value per 500ms
+  // Turn off train pulse
+  if (trainsigon && ((t1 - t0train) >= trainsig_width)){
+    digitalWrite(pin_train, LOW);
+    trainsigon = false;
+  }
+
+  // LCD
+  if((millis() - tepTimer > 200) && (trainon || delayon)){         // output a temperature value per 500ms
     tepTimer = millis();
 
     // print the results to the lcd
     lcd.setCursor(0, 1);                   // set the LCD cursor   position
-    if ((trainremain > 0) || (pulseremain > 0)){
+    if (delayon){
+      lcd.print("Train delaying     ");
+    }
+    else if ((trainremain > 0) || (pulseremain > 0)){
       lcd.print("Train ON        ");
     }
     else{
@@ -409,9 +502,20 @@ void loop(){
       lcd.print(trainremain);
     }
     lcd.print(" ");
-    lcd.print("R");
-    lcd.print(tnowtrain/1000);
-    lcd.print("        ");
+    if (delayon){
+      lcd.print("D");
+      lcd.print(tnowdelay/1000);
+      lcd.print("/");
+      lcd.print(traindelay/1000);
+      lcd.print("     ");
+    }
+    else{
+      lcd.print("R");
+      lcd.print(tnowtrain/1000);
+      lcd.print("/");
+      lcd.print(traincycle/1000);
+      lcd.print("    ");
+    }
   }
   //
 }
