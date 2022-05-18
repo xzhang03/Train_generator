@@ -33,7 +33,7 @@ bool showinstruction = true; // Show instructions or not
 
 // Output variables
 const byte pin = 2;
-const byte pin_train = 3; // Digital signal for when each train starts
+const byte pin_train = A5; // Digital signal for when each train starts
 
 // Train variables
 unsigned int pulsewidth = 150; // in millisecs

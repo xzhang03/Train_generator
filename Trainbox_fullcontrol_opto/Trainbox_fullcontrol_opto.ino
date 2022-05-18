@@ -125,8 +125,8 @@ void setup(){
   t0train = millis();
 
   // Reset
-  pulseremain = pulsenum;
-  trainremain = trainnum;
+  pulseremain = 0;
+  trainremain = 0;
 }
 
 void loop(){
