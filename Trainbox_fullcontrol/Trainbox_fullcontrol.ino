@@ -34,6 +34,7 @@ bool showinstruction = true; // Show instructions or not
 // Output variables
 const byte pin = 2;
 const byte pin_train = A5; // Digital signal for when each train starts
+const byte pin_train_long = A4; // Signal when each train starts and ends
 
 // Train variables
 unsigned int pulsewidth = 150; // in millisecs
@@ -88,6 +89,8 @@ void setup(){
 
   // Pin
   pinMode(pin, OUTPUT);
+  pinMode(pin_train, OUTPUT);
+  pinMode(pin_train_long, OUTPUT);
 
   // Serial
   if (debugmode){
@@ -406,7 +409,7 @@ void loop(){
     startbuttondown = false;
   }
 
-  // Delay is on
+  // Delay is on 
   if ((tnowdelay >= traindelay) && (delayon == true)){
     delayon = false;
     trainon = true;
@@ -424,6 +427,9 @@ void loop(){
     pulseon = false;
     digitalWrite(13, LOW);
     digitalWrite(pin, LOW);
+    if (trainremain  == 0){
+      digitalWrite(pin_train_long, LOW);
+    }
   }
 
   // LED on
@@ -453,6 +459,7 @@ void loop(){
 
     // Train on signal
     digitalWrite(pin_train, HIGH);
+    digitalWrite(pin_train_long, HIGH);
     trainsigon = true;
 
     if (debugmode){
