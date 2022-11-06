@@ -1,19 +1,3 @@
-/*******************************************************
-
-   Description:
-   Reads an analog input on pin 1, prints the result to the LCD.
-   This program takes the temperture sensor LM35 for example.
-
-   Connection:
-   Plug the LCD Keypad to the UNO(or other controllers)
-   Temperture sensor:
-   S(blue) -- A1()
-     Note: A0 has been occupied.
-   VCC(red) -- VCC
-   GND(black) -- GND
-
-********************************************************/
-
 #include <LiquidCrystal.h>
 
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);        // select the pins used on the LCD panel
@@ -61,6 +45,7 @@ byte trainremain;
 bool pulseon = false;
 bool trainon = false;
 bool delayon = false;
+bool traindone = false;
 bool trainsigon = false;
 
 // Pulse time variables
@@ -161,6 +146,12 @@ void loop(){
   button = val / 200;       // 5 - nothing, 4 - select, 3 - left, 2 - down, 1 - up, 0 - right
 
   parsemenu();
+  if ((!trainon && !delayon) || traindone){
+    parsehold();
+  }
+  else{
+    startbuttondown = false;
+  }
   
   // Not trainon not delay on
   if((millis() - tepTimer > 300)){         // output a temperature value per 500ms
@@ -173,7 +164,7 @@ void loop(){
     tepTimer = millis();
     drawhold();
   }
-  parsehold();
+  
 }
 
 void dotrain(void){
@@ -195,8 +186,12 @@ void dotrain(void){
     pulseon = false;
     digitalWrite(13, LOW);
     digitalWrite(pin, LOW);
-    if (trainremain  == 0){
+    if (pulseremain  == 0){
       digitalWrite(pin_train_long, LOW);
+
+      if (trainremain == 0){
+        traindone = true;
+      }
     }
   }
 
@@ -514,14 +509,16 @@ void parsehold(void){
           Serial.println(t1/1000);
         }
       }
-      else{
+      else if (traindone){
         // Reset
         delayon = false;
         trainon = false;
         pulseon = false;
+        traindone = false;
         digitalWrite(13, LOW);
         digitalWrite(pin, LOW);
         digitalWrite(pin_train, LOW);
+        startbuttondowntime = startbuttoncurrenttime;
         if (debugmode){
           Serial.print("Train reset at (s):");
           Serial.println(t1/1000);
