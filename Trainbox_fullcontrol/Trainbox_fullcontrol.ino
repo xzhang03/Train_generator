@@ -154,24 +154,101 @@ void loop(){
   tnowtrain = t1 - t0train;
   tnowdelay = t1 - t0delay;
 
-  // Input low noise
-  /*
-  val = 0;
-  buttongoodreads = 0;
-  for (i = 0; i < buttonreads; i++){
-    val0 = analogRead(0);
-    if (val0 <= 900){
-      val = val + val0;        // read the analog in value:
-      buttongoodreads++;
-    }
-  }
-  // button = val / 200 / buttongoodreads;       // 5 - nothing, 4 - select, 3 - left, 2 - down, 1 - up, 0 - right
-  */
+  dotrain();
   
   // Input
   val = analogRead(0);        // read the analog in value:
   button = val / 200;       // 5 - nothing, 4 - select, 3 - left, 2 - down, 1 - up, 0 - right
 
+  parsemenu();
+  
+  // Not trainon not delay on
+  if((millis() - tepTimer > 300)){         // output a temperature value per 500ms
+    if (!trainon && !delayon){
+      drawmenu();
+    }
+    else{
+      drawactive();
+    }
+    tepTimer = millis();
+    drawhold();
+  }
+  parsehold();
+}
+
+void dotrain(void){
+  // Delay is on 
+  if ((tnowdelay >= traindelay) && (delayon == true)){
+    delayon = false;
+    trainon = true;
+    t0train = millis();
+    trainremain = trainnum;
+
+    if (debugmode){
+      Serial.print("Train is starting at (s):");
+      Serial.println(t1/1000);
+    }
+  }
+  
+  // LED off
+  if ((tnow > pulsewidth) && (pulseon == true)){
+    pulseon = false;
+    digitalWrite(13, LOW);
+    digitalWrite(pin, LOW);
+    if (trainremain  == 0){
+      digitalWrite(pin_train_long, LOW);
+    }
+  }
+
+  // LED on
+  if ((tnow >= pulsecycle) && (pulseon == false) && (pulseremain > 0) && (trainon == true)){
+    pulseremain = pulseremain - 1;
+    pulseon = true;
+    t0 = millis();
+    digitalWrite(13, HIGH);
+    digitalWrite(pin, HIGH);
+
+    if (debugmode){
+      Serial.print("Pulse at ms = ");
+      Serial.print(tnow);
+      Serial.print(" ");
+      Serial.print(pulseremain);
+      Serial.println(" pulses left.");
+    }
+  }
+
+  // Train
+  if ((tnowtrain >= traincycle) && (trainremain > 0) && (trainon == true)){
+    if (!infinitymode){
+      trainremain = trainremain - 1;
+    }
+    t0train = millis();
+    pulseremain = pulsenum;
+
+    // Train on signal
+    digitalWrite(pin_train, HIGH);
+    digitalWrite(pin_train_long, HIGH);
+    trainsigon = true;
+
+    if (debugmode){
+      Serial.print("Train ");
+      Serial.print(trainremain);
+      Serial.print(" starts at T = ");
+      Serial.print(t1/1000);
+      Serial.print(" with ");
+      Serial.print(pulseremain);
+      Serial.println(" pulses to start.");
+    }
+  }
+
+  // Turn off train pulse
+  if (trainsigon && ((t1 - t0train) >= trainsig_width)){
+    digitalWrite(pin_train, LOW);
+    trainsigon = false;
+  }
+}
+
+void parsemenu(void){
   // Page down
   if ((button == 2) && !downbuttondown){
     if (cursorind < maxcursorind){
@@ -299,92 +376,123 @@ void loop(){
   if (button != 3){
     leftbuttondown = false;
   }
-  
-  // lcd, set up stage
-  if((millis() - tepTimer > 300) && !trainon && !delayon){         // output a temperature value per 500ms
-    tepTimer = millis();
+}
 
-    // print the results to the lcd
-    lcd.setCursor(0, 0);                   // set the LCD cursor   position
+void drawmenu(void){
+  // print the results to the lcd
+  lcd.setCursor(0, 0);                   // set the LCD cursor   position
 
-    switch (cursorind){
-      case 1:
-        lcd.print("Pulse width:    ");
-        lcd.setCursor(0, 1);
-        lcd.print(pulsewidth);
-        lcd.print(" ms           ");
-        break;
-      case 2:
-        lcd.print("Pulse cycle:    ");
-        lcd.setCursor(0, 1);
-        lcd.print(pulsecycle);
-        lcd.print(" ms           ");
-        break;
-      case 3:
-        lcd.print("Pulses per train:");
-        lcd.setCursor(0, 1);
-        lcd.print(pulsenum);
-        lcd.print("               ");
-        break;
-      case 4:
-        lcd.print("Train cycle:    ");
-        lcd.setCursor(0, 1);
-        lcd.print(traincycle/1000);
-        lcd.print(" s           ");
-        break;
-      case 5:
-        lcd.print("Num of trains:   ");
-        lcd.setCursor(0, 1);
-        if (infinitymode){
-          lcd.print("INF");
-        }
-        else{
-          lcd.print(trainnum);
-        }
-        lcd.print("              ");
-        break;
-      case 6:
-        lcd.print("Train delay:    ");
-        lcd.setCursor(0, 1);
-        lcd.print(traindelay/1000);
-        lcd.print(" s           ");
-        break;
-      case maxcursorind:
-        lcd.print("P ");
-        lcd.print(pulsenum);
-        lcd.print(" X ");
-        lcd.print(pulsewidth);
-        lcd.print(" / ");
-        lcd.print(pulsecycle);
-        lcd.print("     ");
-        lcd.setCursor(0, 1);
-        lcd.print("T ");
-        if (!infinitymode){
-          lcd.print(trainnum);
-        }
-        else{
-          lcd.print("I");
-        }
-        lcd.print(" X ");
-        lcd.print(traincycle/1000);
-        lcd.print(" D ");
-        lcd.print(traindelay/1000);
-        lcd.print("         ");
-        break;
-    }
+  switch (cursorind){
+    case 1:
+      lcd.print("Pulse width:    ");
+      lcd.setCursor(0, 1);
+      lcd.print(pulsewidth);
+      lcd.print(" ms           ");
+      break;
+    case 2:
+      lcd.print("Pulse cycle:    ");
+      lcd.setCursor(0, 1);
+      lcd.print(pulsecycle);
+      lcd.print(" ms           ");
+      break;
+    case 3:
+      lcd.print("Pulses per train:");
+      lcd.setCursor(0, 1);
+      lcd.print(pulsenum);
+      lcd.print("               ");
+      break;
+    case 4:
+      lcd.print("Train cycle:    ");
+      lcd.setCursor(0, 1);
+      lcd.print(traincycle/1000);
+      lcd.print(" s           ");
+      break;
+    case 5:
+      lcd.print("Num of trains:   ");
+      lcd.setCursor(0, 1);
+      if (infinitymode){
+        lcd.print("INF");
+      }
+      else{
+        lcd.print(trainnum);
+      }
+      lcd.print("              ");
+      break;
+    case 6:
+      lcd.print("Train delay:    ");
+      lcd.setCursor(0, 1);
+      lcd.print(traindelay/1000);
+      lcd.print(" s           ");
+      break;
+    case maxcursorind:
+      lcd.print("P ");
+      lcd.print(pulsenum);
+      lcd.print(" X ");
+      lcd.print(pulsewidth);
+      lcd.print(" / ");
+      lcd.print(pulsecycle);
+      lcd.print("     ");
+      lcd.setCursor(0, 1);
+      lcd.print("T ");
+      if (!infinitymode){
+        lcd.print(trainnum);
+      }
+      else{
+        lcd.print("I");
+      }
+      lcd.print(" X ");
+      lcd.print(traincycle/1000);
+      lcd.print(" D ");
+      lcd.print(traindelay/1000);
+      lcd.print("         ");
+      break;
+  }
+}
 
-    // Pushing
-    if (startbuttondown){
-      lcd.setCursor(15, 1);
-      lcd.print("H");
-    }
-    else{
-      lcd.setCursor(15, 1);
-      lcd.print(" ");
-    }
-    
+void drawactive(void){
+  // print the results to the lcd
+  lcd.setCursor(0, 1);                   // set the LCD cursor   position
+  if (delayon){
+    lcd.print("Train delaying     ");
+  }
+  else if ((trainremain > 0) || (pulseremain > 0)){
+    lcd.print("Train ON        ");
+  }
+  else{
+    lcd.print("Train DONE       ");
   }
 
+
+  // Serial
+  lcd.setCursor(0, 0);                   // set the LCD cursor   position
+  lcd.print("P");
+  lcd.print(pulseremain);
+  lcd.print(" ");
+  lcd.print("T");
+  if (infinitymode){
+    lcd.print("I");
+  }
+  else{
+    lcd.print(trainremain);
+  }
+  lcd.print(" ");
+  if (delayon){
+    lcd.print("D");
+    lcd.print(tnowdelay/1000);
+    lcd.print("/");
+    lcd.print(traindelay/1000);
+    lcd.print("     ");
+  }
+  else{
+    lcd.print("R");
+    lcd.print(tnowtrain/1000);
+    lcd.print("/");
+    lcd.print(traincycle/1000);
+    lcd.print("    ");
+  }
+}
+
+void parsehold(void){
   // Holding start
   if (button == 4){
     startbuttoncurrenttime = millis();
@@ -393,136 +501,47 @@ void loop(){
       startbuttondowntime = startbuttoncurrenttime;
       startbuttondown = true;
     }
-    else if ((startbuttoncurrenttime - startbuttondowntime > startbuttonhold) && !trainon && !delayon){
-      // Starting delay, which can be 0
-      delayon = true;
-      t0delay = t1;
-      tnowdelay = 0;
-
-      if (debugmode){
-        Serial.print("Train delay starting at (s):");
-        Serial.println(t1/1000);
+    else if ((startbuttoncurrenttime - startbuttondowntime > startbuttonhold)){
+      // Gets here if holding long enough
+      if (!trainon && !delayon){
+        // Starting delay, which can be 0
+        delayon = true;
+        t0delay = t1;
+        tnowdelay = 0;
+  
+        if (debugmode){
+          Serial.print("Train delay starting at (s):");
+          Serial.println(t1/1000);
+        }
+      }
+      else{
+        // Reset
+        delayon = false;
+        trainon = false;
+        pulseon = false;
+        digitalWrite(13, LOW);
+        digitalWrite(pin, LOW);
+        digitalWrite(pin_train, LOW);
+        if (debugmode){
+          Serial.print("Train reset at (s):");
+          Serial.println(t1/1000);
+        }
       }
     }
   }
   else{
     startbuttondown = false;
   }
+}
 
-  // Delay is on 
-  if ((tnowdelay >= traindelay) && (delayon == true)){
-    delayon = false;
-    trainon = true;
-    t0train = millis();
-    trainremain = trainnum;
-
-    if (debugmode){
-      Serial.print("Train is starting at (s):");
-      Serial.println(t1/1000);
-    }
+void drawhold(void){
+  // Pushing
+  if (startbuttondown){
+    lcd.setCursor(15, 1);
+    lcd.print("H");
   }
-  
-  // LED off
-  if ((tnow > pulsewidth) && (pulseon == true)){
-    pulseon = false;
-    digitalWrite(13, LOW);
-    digitalWrite(pin, LOW);
-    if (trainremain  == 0){
-      digitalWrite(pin_train_long, LOW);
-    }
-  }
-
-  // LED on
-  if ((tnow >= pulsecycle) && (pulseon == false) && (pulseremain > 0) && (trainon == true)){
-    pulseremain = pulseremain - 1;
-    pulseon = true;
-    t0 = millis();
-    digitalWrite(13, HIGH);
-    digitalWrite(pin, HIGH);
-
-    if (debugmode){
-      Serial.print("Pulse at ms = ");
-      Serial.print(tnow);
-      Serial.print(" ");
-      Serial.print(pulseremain);
-      Serial.println(" pulses left.");
-    }
-  }
-
-  // Train
-  if ((tnowtrain >= traincycle) && (trainremain > 0) && (trainon == true)){
-    if (!infinitymode){
-      trainremain = trainremain - 1;
-    }
-    t0train = millis();
-    pulseremain = pulsenum;
-
-    // Train on signal
-    digitalWrite(pin_train, HIGH);
-    digitalWrite(pin_train_long, HIGH);
-    trainsigon = true;
-
-    if (debugmode){
-      Serial.print("Train ");
-      Serial.print(trainremain);
-      Serial.print(" starts at T = ");
-      Serial.print(t1/1000);
-      Serial.print(" with ");
-      Serial.print(pulseremain);
-      Serial.println(" pulses to start.");
-    }
-  }
-
-  // Turn off train pulse
-  if (trainsigon && ((t1 - t0train) >= trainsig_width)){
-    digitalWrite(pin_train, LOW);
-    trainsigon = false;
-  }
-
-  // LCD
-  if((millis() - tepTimer > 200) && (trainon || delayon)){         // output a temperature value per 500ms
-    tepTimer = millis();
-
-    // print the results to the lcd
-    lcd.setCursor(0, 1);                   // set the LCD cursor   position
-    if (delayon){
-      lcd.print("Train delaying     ");
-    }
-    else if ((trainremain > 0) || (pulseremain > 0)){
-      lcd.print("Train ON        ");
-    }
-    else{
-      lcd.print("Train DONE       ");
-    }
-
-
-    // Serial
-    lcd.setCursor(0, 0);                   // set the LCD cursor   position
-    lcd.print("P");
-    lcd.print(pulseremain);
+  else{
+    lcd.setCursor(15, 1);
     lcd.print(" ");
-    lcd.print("T");
-    if (infinitymode){
-      lcd.print("I");
-    }
-    else{
-      lcd.print(trainremain);
-    }
-    lcd.print(" ");
-    if (delayon){
-      lcd.print("D");
-      lcd.print(tnowdelay/1000);
-      lcd.print("/");
-      lcd.print(traindelay/1000);
-      lcd.print("     ");
-    }
-    else{
-      lcd.print("R");
-      lcd.print(tnowtrain/1000);
-      lcd.print("/");
-      lcd.print(traincycle/1000);
-      lcd.print("    ");
-    }
   }
-  //
 }
