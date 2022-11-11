@@ -45,8 +45,10 @@ byte trainremain;
 bool pulseon = false;
 bool trainon = false;
 bool delayon = false;
+bool firsttrain = false; // Fire off the first train when delay is done
 bool traindone = false;
 bool trainsigon = false;
+
 
 // Pulse time variables
 unsigned long t0, t1, tnow, t0train, tnowtrain, t0delay, tnowdelay;
@@ -170,13 +172,14 @@ void loop(){
 void dotrain(void){
   // Delay is on 
   if ((tnowdelay >= traindelay) && (delayon == true)){
+    // Delay is done
     delayon = false;
     trainon = true;
     t0train = millis();
     trainremain = trainnum;
-
+    firsttrain = true; // Fire off first train no matter what
     if (debugmode){
-      Serial.print("Train is starting at (s):");
+      Serial.print("Train is starting at (s): ");
       Serial.println(t1/1000);
     }
   }
@@ -191,6 +194,10 @@ void dotrain(void){
 
       if (trainremain == 0){
         traindone = true;
+        if (debugmode){
+          Serial.print("Train is done at T = ");
+          Serial.println(t1/1000);
+        }
       }
     }
   }
@@ -213,11 +220,11 @@ void dotrain(void){
   }
 
   // Train
-  if ((tnowtrain >= traincycle) && (trainremain > 0) && (trainon == true)){
+  if (((tnowtrain >= traincycle) || firsttrain) && (trainremain > 0) && (trainon == true)){
     if (!infinitymode){
       trainremain = trainremain - 1;
     }
-    t0train = millis();
+    t0train = t1;
     pulseremain = pulsenum;
 
     // Train on signal
@@ -225,6 +232,11 @@ void dotrain(void){
     digitalWrite(pin_train_long, HIGH);
     trainsigon = true;
 
+    // Turn off first train flag (which ignores train cycle)
+    if (firsttrain){
+      firsttrain = false;
+    }
+    
     if (debugmode){
       Serial.print("Train ");
       Serial.print(trainremain);
@@ -505,7 +517,7 @@ void parsehold(void){
         tnowdelay = 0;
   
         if (debugmode){
-          Serial.print("Train delay starting at (s):");
+          Serial.print("Train delay starting at (s): ");
           Serial.println(t1/1000);
         }
       }
@@ -520,7 +532,7 @@ void parsehold(void){
         digitalWrite(pin_train, LOW);
         startbuttondowntime = startbuttoncurrenttime;
         if (debugmode){
-          Serial.print("Train reset at (s):");
+          Serial.print("Train reset at (s): ");
           Serial.println(t1/1000);
         }
       }
